@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>Happy Birthday! 🎂</title>
+    <meta name="description" content="A special interactive birthday surprise">
+    <style>
+/* ===== CSS VARIABLES & RESET ===== */
+:root {
+  --bg-dark: #0a0a0a;
+  --terminal-green: #00ff41;
+  --cake-base: #e8a87c;
+  --frosting: #ffd1dc;
+  --frosting2: #c9b1ff;
+  --candle-yellow: #ffe066;
+  --flame-orange: #ff6b35;
+  --flame-yellow: #ffd700;
+  --glass-bg: rgba(255,255,255,0.08);
+  --glass-border: rgba(255,255,255,0.18);
+  --correct: #00e676;
+  --wrong: #ff1744;
+  --accent1: #7c4dff;
+  --accent2: #ff4081;
+  --accent3: #00e5ff;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg-dark); cursor: crosshair;}
+.cursor-trail{position:fixed;width:8px;height:8px;border-radius:50%;pointer-events:none;z-index:9999;animation:fadeOutTrail .5s forwards}
+@keyframes fadeOutTrail{to{transform:scale(0);opacity:0}}
+/* ===== PHASE 0: BOOT SEQUENCE ===== */
+#init-screen{position:fixed;inset:0;background:var(--bg-dark);z-index:2000;display:flex;align-items:center;justify-content:center;flex-direction:column}
+#init-screen button{background:var(--terminal-green);color:var(--bg-dark);border:none;padding:15px 30px;font-size:20px;font-family:'Courier New',monospace;font-weight:bold;cursor:pointer;border-radius:5px;transition:transform 0.2s}
+#init-screen button:hover{transform:scale(1.05)}
+#init-screen button:active{transform:scale(0.95)}
+#boot-screen{position:fixed;inset:0;background:var(--bg-dark);z-index:1000;display:flex;align-items:center;justify-content:center;transition:opacity .8s}
+#boot-screen.fade-out{opacity:0;pointer-events:none}
+#terminal{font-family:'Courier New',monospace;color:var(--terminal-green);font-size:clamp(14px,2.5vw,22px);line-height:1.8;text-shadow:0 0 10px var(--terminal-green),0 0 20px rgba(0,255,65,.3);padding:20px;max-width:600px;width:90%}
+#terminal .line{opacity:0;transform:translateY(5px)}
+#terminal .line.visible{opacity:1;transform:translateY(0);transition:all .3s}
+.cursor-blink{display:inline-block;width:10px;height:1.2em;background:var(--terminal-green);animation:blink .6s step-end infinite;vertical-align:text-bottom;margin-left:2px}
+@keyframes blink{50%{opacity:0}}
+.scanline{position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,65,.03) 2px,rgba(0,255,65,.03) 4px);pointer-events:none;z-index:1}
+
+/* ===== CANVAS ===== */
+#bg-canvas{position:fixed;inset:0;z-index:0}
+
+/* ===== PHASE 1: CAKE ===== */
+#cake-phase{position:fixed;inset:0;z-index:10;display:none;align-items:center;justify-content:center;flex-direction:column}
+#cake-phase.active{display:flex}
+#cake-phase h2{color:#fff;font-size:clamp(20px,5vw,42px);text-align:center;margin-bottom:20px;text-shadow:0 0 30px var(--accent2),0 0 60px var(--accent1);animation:glow-text 2s ease-in-out infinite alternate;font-weight:800;letter-spacing:1px}
+@keyframes glow-text{from{text-shadow:0 0 20px var(--accent2),0 0 40px var(--accent1)}to{text-shadow:0 0 40px var(--accent3),0 0 80px var(--accent2)}}
+.cake-container{position:relative;width:320px;height:300px;margin:20px auto 40px;cursor:pointer;transform:scale(1);transition:transform .8s,opacity .8s;perspective:1000px}
+.cake-container.exit{transform:scale(2);opacity:0}
+.plate{position:absolute;bottom:-40px;left:50%;transform:translateX(-50%);width:380px;height:120px;background:radial-gradient(ellipse at center, #f5f5f5 0%, #dcdcdc 70%, #999 100%);border-radius:50%;box-shadow:0 30px 40px rgba(0,0,0,0.8), inset 0 5px 15px rgba(255,255,255,0.9);border:6px solid #e0e0e0;z-index:1}
+.cake-3d{position:absolute;width:100%;height:100%;bottom:20px;z-index:5}
+.cake-layer{position:absolute;left:50%;transform:translateX(-50%)}
+.cake-side{position:absolute;bottom:0;width:100%;height:100%;border-bottom-left-radius:50% 30px;border-bottom-right-radius:50% 30px;box-shadow:inset -15px 0 25px rgba(0,0,0,0.3), inset 15px 0 25px rgba(255,255,255,0.4)}
+.cake-top{position:absolute;top:-25px;width:100%;height:50px;border-radius:50%;box-shadow:inset 0 -5px 15px rgba(0,0,0,0.15)}
+
+.cake-layer.bottom{bottom:0;width:280px;height:90px}
+.cake-layer.bottom .cake-side{background:linear-gradient(to right, #b46d41 0%, #d4956b 30%, #e8a87c 50%, #d4956b 80%, #a05a30 100%)}
+.cake-layer.bottom .cake-top{background:radial-gradient(ellipse at center, #e8a87c 0%, #d4956b 100%)}
+
+.cake-layer.mid{bottom:90px;width:220px;height:80px}
+.cake-layer.mid .cake-side{background:linear-gradient(to right, #d4a0af 0%, #ffb6c1 30%, #ffd1dc 50%, #ffb6c1 80%, #c48a98 100%)}
+.cake-layer.mid .cake-top{background:radial-gradient(ellipse at center, #ffd1dc 0%, #ffb6c1 100%)}
+
+.cake-layer.top{bottom:170px;width:160px;height:70px}
+.cake-layer.top .cake-side{background:linear-gradient(to right, #9175d6 0%, #a78bfa 30%, #c9b1ff 50%, #a78bfa 80%, #8263c9 100%)}
+.cake-layer.top .cake-top{background:radial-gradient(ellipse at center, #c9b1ff 0%, #a78bfa 100%)}
+
+.frosting-drips{position:absolute;width:100%;height:100%;top:0;left:0;border-radius:50%;pointer-events:none}
+.drip{position:absolute;top:20px;width:16px;background:#c9b1ff;border-radius:0 0 10px 10px;box-shadow:inset -2px 0 5px rgba(0,0,0,0.2)}
+
+.candles{position:absolute;top:15px;left:50%;transform:translateX(-50%);display:flex;justify-content:center;gap:12px;z-index:10;width:150px}
+.candle{display:flex;flex-direction:column;align-items:center;cursor:pointer}
+.candle-stick{width:8px;height:35px;background:linear-gradient(to right,#fff,#e0e0e0);border-radius:3px}
+.flame-wrap{width:20px;height:30px;position:relative;margin-bottom:-3px;transition:all .3s}
+.flame-wrap.out{transform:scale(0);opacity:0}
+.flame{position:absolute;bottom:0;left:50%;width:12px;height:22px;background:radial-gradient(ellipse,var(--flame-yellow),var(--flame-orange),transparent 70%);border-radius:50% 50% 50% 50%/60% 60% 40% 40%;transform:translateX(-50%);animation:flicker .15s ease-in-out infinite alternate;filter:blur(.5px)}
+@keyframes flicker{0%{transform:translateX(-50%) scale(1) rotate(-2deg)}100%{transform:translateX(-50%) scale(1.1,.9) rotate(2deg)}}
+.flame::after{content:'';position:absolute;bottom:2px;left:50%;width:6px;height:10px;background:rgba(255,255,255,.7);border-radius:50%;transform:translateX(-50%);filter:blur(1px)}
+.flame-glow{position:absolute;bottom:-5px;left:50%;width:30px;height:30px;background:radial-gradient(circle,rgba(255,200,0,.4),transparent 70%);transform:translateX(-50%);border-radius:50%;animation:glow-pulse 1s ease-in-out infinite alternate}
+@keyframes glow-pulse{to{opacity:.5;transform:translateX(-50%) scale(1.2)}}
+#blow-hint{color:rgba(255,255,255,.7);font-size:clamp(12px,2vw,16px);margin-top:20px;animation:fade-hint 2s ease-in-out infinite alternate}
+@keyframes fade-hint{from{opacity:.4}to{opacity:1}}
+
+/* ===== PHASE 2: QUIZ ===== */
+#quiz-phase{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:20px}
+#quiz-phase.active{display:flex}
+.quiz-modal{background:var(--glass-bg);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border:1px solid var(--glass-border);border-radius:24px;padding:clamp(20px,4vw,40px);max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.1);color:#fff;transition:transform .1s,opacity .8s}
+.quiz-modal.shake{animation:shake .5s}
+@keyframes shake{0%,100%{transform:translate(0)}10%{transform:translate(-12px,5px)}20%{transform:translate(12px,-5px)}30%{transform:translate(-8px,8px)}40%{transform:translate(8px,-3px)}50%{transform:translate(-5px,5px)}60%{transform:translate(5px,-2px)}}
+.quiz-modal.exit{opacity:0;transform:scale(.9)}
+.progress-bar-bg{width:100%;height:8px;background:rgba(255,255,255,.1);border-radius:4px;margin-bottom:25px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent1),var(--accent3));border-radius:4px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.q-counter{font-size:13px;color:rgba(255,255,255,.5);margin-bottom:8px;text-align:right}
+.q-text{font-size:clamp(16px,3vw,22px);font-weight:700;margin-bottom:25px;line-height:1.4}
+.options{display:flex;flex-direction:column;gap:12px}
+.opt-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#fff;padding:14px 20px;border-radius:14px;font-size:clamp(14px,2.2vw,17px);cursor:pointer;transition:all .25s;text-align:left;font-family:inherit;position:relative;overflow:hidden}
+.opt-btn:hover{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);transform:translateX(5px)}
+.opt-btn.correct{background:rgba(0,230,118,.25)!important;border-color:var(--correct)!important;animation:pulse-correct .6s}
+.opt-btn.wrong{background:rgba(255,23,68,.2)!important;border-color:var(--wrong)!important}
+@keyframes pulse-correct{0%,100%{box-shadow:0 0 0 0 rgba(0,230,118,.4)}50%{box-shadow:0 0 0 12px rgba(0,230,118,0)}}
+/* Text-answer input */
+.text-answer-wrap{display:flex;gap:10px;flex-direction:column}
+.text-answer-input{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#fff;padding:14px 18px;border-radius:14px;font-size:clamp(14px,2.2vw,17px);font-family:inherit;width:100%;outline:none;transition:border-color .25s,box-shadow .25s}
+.text-answer-input:focus{border-color:var(--accent3);box-shadow:0 0 0 3px rgba(0,229,255,.15)}
+.text-answer-input.correct-input{border-color:var(--correct);box-shadow:0 0 0 4px rgba(0,230,118,.2);animation:pulse-correct .6s}
+.text-answer-input.wrong-input{border-color:var(--wrong);box-shadow:0 0 0 4px rgba(255,23,68,.2);animation:shakeInput .4s}
+@keyframes shakeInput{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+.submit-btn{background:linear-gradient(135deg,var(--accent1),var(--accent2));border:none;color:#fff;padding:13px 28px;border-radius:14px;font-size:clamp(14px,2.2vw,17px);cursor:pointer;font-family:inherit;font-weight:700;transition:transform .2s,box-shadow .2s}
+.submit-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(124,77,255,.4)}
+.submit-btn:active{transform:translateY(0)}
+.hint-text{font-size:12px;color:rgba(255,255,255,.35);text-align:right;margin-top:-6px;}
+
+/* ===== PHASE 2.5: SCRATCH CARD ===== */
+#scratch-phase{position:fixed;inset:0;z-index:25;display:none;align-items:center;justify-content:center;flex-direction:column;padding:20px}
+#scratch-phase.active{display:flex}
+.scratch-container{position:relative;width:320px;height:200px;border-radius:16px;overflow:hidden;box-shadow:0 15px 35px rgba(0,0,0,.5);background:var(--glass-bg);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;border:1px solid var(--glass-border);text-align:center;padding:20px}
+.scratch-secret{font-size:clamp(18px,4vw,24px);font-weight:800;color:var(--accent3);text-shadow:0 0 15px var(--accent1)}
+#scratch-canvas{position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;transition:opacity .5s}
+#scratch-next-btn{margin-top:30px;opacity:0;pointer-events:none;transform:translateY(20px);transition:all .5s}
+#scratch-next-btn.show{opacity:1;pointer-events:auto;transform:translateY(0)}
+
+/* ===== PHASE 2.75: BALLOON GAME ===== */
+#balloon-game-phase{position:fixed;inset:0;z-index:28;display:none;align-items:center;justify-content:center;flex-direction:column;pointer-events:none}
+#balloon-game-phase.active{display:flex}
+.balloon-hud{position:absolute;top:30px;display:flex;justify-content:space-between;width:100%;padding:0 40px;pointer-events:none;transition:opacity .5s}
+.hud-box{background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.2);padding:15px 25px;border-radius:12px;backdrop-filter:blur(5px);color:#fff;text-align:center}
+.hud-label{font-size:12px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:1px}
+.hud-val{font-size:32px;font-weight:900;margin-top:5px;text-shadow:0 0 15px currentColor}
+#bg-timer-val{color:var(--flame-yellow)}
+#bg-score-val{color:var(--correct)}
+#balloon-game-result{display:none;flex-direction:column;align-items:center;background:var(--glass-bg);backdrop-filter:blur(20px);border:1px solid var(--glass-border);padding:40px;border-radius:20px;pointer-events:auto;text-align:center}
+
+/* ===== FINALE ===== */
+#finale{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:20px;overflow-y:auto}
+#finale.active{display:flex}
+#finale h1{font-size:clamp(28px,7vw,72px);font-weight:900;background:linear-gradient(135deg,var(--accent3),var(--accent1),var(--accent2),var(--flame-yellow));background-size:300% 300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:gradient-shift 3s ease infinite;filter:drop-shadow(0 0 30px rgba(124,77,255,.5));line-height:1.2;margin-bottom:15px}
+@keyframes gradient-shift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+#finale p{color:rgba(255,255,255,.7);font-size:clamp(14px,2.5vw,20px)}
+@keyframes screenShake{0%,100%{transform:translate(0,0)}10%{transform:translate(-8px,5px)}20%{transform:translate(8px,-5px)}30%{transform:translate(-6px,6px)}40%{transform:translate(6px,-3px)}50%{transform:translate(-4px,4px)}60%{transform:translate(4px,-2px)}70%{transform:translate(-2px,2px)}80%{transform:translate(2px,-1px)}90%{transform:translate(-1px,1px)}}
+body.screen-shake{animation:screenShake .4s ease}
+#heat-bar-wrap{width:min(380px,90vw);height:14px;background:rgba(255,255,255,.1);border-radius:7px;overflow:hidden;margin:8px auto 0}
+#heat-bar{height:100%;width:0%;border-radius:7px;transition:width .4s,background .4s;background:linear-gradient(90deg,#00e676,#ffd700)}
+#heat-label{font-size:clamp(12px,2vw,16px);color:rgba(255,255,255,.7);margin:4px 0 0;letter-spacing:.5px}
+#countdown-wrap{display:flex;align-items:center;justify-content:center;gap:10px;margin:6px 0}
+#countdown-num{font-size:clamp(26px,5vw,42px);font-weight:900;color:#ffd700;text-shadow:0 0 20px #ffd700;min-width:50px}
+#countdown-label{font-size:13px;color:rgba(255,255,255,.5)}
+#countdown-wrap.danger #countdown-num{color:#ff1744;text-shadow:0 0 20px #ff1744;animation:blink .4s step-end infinite}
+#letter-wrap{max-width:500px;width:90vw;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:28px 32px;text-align:left;backdrop-filter:blur(10px);margin-top:16px}
+#letter-text{font-family:'Courier New',monospace;font-size:clamp(13px,1.8vw,17px);line-height:1.9;color:#e0e0e0;white-space:pre-wrap;min-height:80px}
+#letter-sig{margin-top:14px;font-size:clamp(13px,1.8vw,16px);color:rgba(255,255,255,.5);font-style:italic}
+
+
+/* ===== 3D PRESENT BOX ===== */
+#present-phase{padding:20px;}
+.gift-scene{perspective:900px;width:220px;height:260px;margin:0 auto;cursor:pointer;position:relative;}
+.gift-box{width:220px;height:180px;position:absolute;bottom:0;transform-style:preserve-3d;transform:rotateX(20deg) rotateY(-25deg);transition:transform .4s cubic-bezier(.175,.885,.32,1.275);}
+.gift-box:hover{transform:rotateX(20deg) rotateY(-25deg) scale(1.06);}
+.gift-face{position:absolute;width:220px;height:180px;border-radius:4px;}
+.gift-front {background:linear-gradient(135deg,#ff4081,#c2185b);transform:translateZ(110px);box-shadow:inset 0 0 30px rgba(0,0,0,.25);}
+.gift-back  {background:linear-gradient(135deg,#ad1457,#880e4f);transform:rotateY(180deg) translateZ(110px);}
+.gift-left  {background:linear-gradient(135deg,#c2185b,#ad1457);width:220px;transform:rotateY(-90deg) translateZ(110px);}
+.gift-right {background:linear-gradient(135deg,#e91e63,#c2185b);width:220px;transform:rotateY(90deg) translateZ(110px);}
+.gift-bottom{background:#880e4f;height:220px;transform:rotateX(-90deg) translateZ(0px);}
+/* Ribbon stripes on faces */
+.gift-front::before,.gift-front::after{content:'';position:absolute;background:rgba(255,215,0,.7);}
+.gift-front::before{width:30px;height:100%;left:50%;transform:translateX(-50%);}
+.gift-front::after{height:30px;width:100%;top:50%;transform:translateY(-50%);}
+/* Lid */
+.gift-lid{position:absolute;bottom:170px;left:0;width:220px;height:55px;transform-style:preserve-3d;transform:rotateX(20deg) rotateY(-25deg);transition:transform .5s ease,top 1s ease,opacity .5s ease;}
+.gift-lid.open{animation:lidFly 1s ease forwards;}
+@keyframes lidFly{0%{transform:rotateX(20deg) rotateY(-25deg)}30%{transform:rotateX(-60deg) rotateY(-25deg) translateY(-120px)}100%{transform:rotateX(-90deg) rotateY(-25deg) translateY(-300px) translateX(150px);opacity:0;}}
+.lid-face{position:absolute;}
+.lid-top   {width:220px;height:220px;background:linear-gradient(135deg,#ff6090,#ff4081);border-radius:4px;transform:rotateX(90deg) translateZ(55px); box-shadow: 0 -5px 15px rgba(0,0,0,0.3);}
+.lid-top::before,.lid-top::after{content:'';position:absolute;background:rgba(255,215,0,.7);}
+.lid-top::before{width:30px;height:100%;left:50%;transform:translateX(-50%);}
+.lid-top::after{height:30px;width:100%;top:50%;transform:translateY(-50%);}
+.lid-front {width:220px;height:55px;background:linear-gradient(to bottom,#ff6090,#ff4081);transform:translateZ(110px);}
+.lid-left  {width:220px;height:55px;background:linear-gradient(to bottom,#e55c80,#d81b60);transform:rotateY(-90deg) translateZ(110px);}
+.lid-right {width:220px;height:55px;background:linear-gradient(to bottom,#ff7aa4,#ff4081);transform:rotateY(90deg) translateZ(110px);}
+.lid-back  {width:220px;height:55px;background:#c2185b;transform:rotateY(180deg) translateZ(110px);}
+/* Bow */
+.bow{position:absolute;bottom:210px;left:50%;transform:translateX(-50%) rotateX(20deg) rotateY(-25deg);z-index:20;font-size:52px;line-height:1;text-shadow:0 4px 10px rgba(0,0,0,.3);transition:opacity .5s;pointer-events:none;}
+.bow.hidden{opacity:0;}
+/* Box counter badge */
+#box-counter{color:#fff;font-size:22px;margin-top:18px;font-weight:700;letter-spacing:1px;text-shadow:0 0 15px rgba(255,64,129,.8);}
+/* Final reveal message */
+#final-reveal{display:none;flex-direction:column;align-items:center;gap:12px;}
+#final-reveal .reveal-msg{font-size:clamp(22px,5vw,48px);font-weight:900;background:linear-gradient(135deg,#00e676,#00e5ff,#ffd700);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:gradient-shift 2s ease infinite;filter:drop-shadow(0 0 20px rgba(0,230,118,.6));}
+#final-reveal .reveal-sub{color:rgba(255,255,255,.7);font-size:clamp(14px,2vw,20px);}
+</style>
+  </head>
+  <body>
+
+    <!-- Init Screen for Audio Autoplay -->
+    <div id="init-screen">
+      <button id="start-btn">INITIALIZE SURPRISE.exe</button>
+    </div>
+
+    <!-- Background Audio -->
+    <!-- Background Music — place your MP3 files in the /audio folder -->
+    <audio id="bg-audio" loop src="audio/background.mp3"></audio>
+    <audio id="sfx-buzz" src="audio/buzz.mp3"></audio>
+    <audio id="sfx-pop" src="audio/pop.mp3"></audio>
+    <audio id="sfx-fanfare" src="audio/fanfare.mp3"></audio>
+
+    <!-- Phase 0: Boot -->
+    <div id="boot-screen" style="display:none;">
+      <div class="scanline"></div>
+      <div id="terminal">
+        <div class="line" data-text="> Initializing Birthday Protocol..."></div>
+        <div class="line" data-text="> Loading assets..."></div>
+        <div class="line" data-text="> Compiling Surprise..."></div>
+        <div class="line" data-text="> Executing: Happy_Birthday.exe"></div>
+      </div>
+    </div>
+
+    <!-- Background Canvas -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Phase 1: Cake -->
+    <div id="cake-phase">
+      <h2>🎂 Click the flames to blow them out! 🎂</h2>
+      <div class="cake-container" id="cake">
+        <div class="plate"></div>
+        <div class="cake-3d">
+          <div class="cake-layer bottom">
+            <div class="cake-side"></div>
+            <div class="cake-top"></div>
+          </div>
+          <div class="cake-layer mid">
+            <div class="cake-side"></div>
+            <div class="cake-top"></div>
+          </div>
+          <div class="cake-layer top">
+            <div class="cake-side"></div>
+            <div class="cake-top">
+              <div class="frosting-drips">
+                <div class="drip" style="left:10%; height:25px;"></div>
+                <div class="drip" style="left:30%; height:45px;"></div>
+                <div class="drip" style="left:50%; height:20px;"></div>
+                <div class="drip" style="left:70%; height:50px;"></div>
+                <div class="drip" style="left:85%; height:30px;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="candles" id="candles"></div>
+        </div>
+      </div>
+      <p id="blow-hint">Tap each flame or BLOW INTO YOUR MIC to extinguish
+        it!</p>
+    </div>
+
+    <!-- Phase 2: Quiz -->
+    <div id="quiz-phase">
+      <div class="quiz-modal" id="quiz-modal">
+        <div class="progress-bar-bg"><div class="progress-bar-fill"
+            id="progress-fill"></div></div>
+        <div class="q-counter" id="q-counter"></div>
+        <div class="q-text" id="q-text"></div>
+        <div class="options" id="options"></div>
+      </div>
+    </div>
+
+    <!-- Phase 2.5: Scratch Card -->
+    <div id="scratch-phase">
+      <h2
+        style="color:#fff;margin-bottom:20px;text-shadow:0 0 15px var(--accent2)">Scratch
+        to reveal...</h2>
+      <div class="scratch-container">
+        <div class="scratch-secret">You unlocked the final challenge!</div>
+        <canvas id="scratch-canvas" width="320" height="200"></canvas>
+      </div>
+      <button id="scratch-next-btn" class="submit-btn">Continue ➔</button>
+    </div>
+
+    <!-- Phase 2.75: Balloon Game -->
+    <div id="balloon-game-phase">
+      <div class="balloon-hud" id="balloon-hud">
+        <div class="hud-box">
+          <div class="hud-label">Time Left</div>
+          <div class="hud-val" id="bg-timer-val">10</div>
+        </div>
+        <div class="hud-box">
+          <div class="hud-label">Popped</div>
+          <div class="hud-val" id="bg-score-val">0</div>
+        </div>
+      </div>
+      <div id="balloon-game-result">
+        <h2 id="bg-result-title"
+          style="font-size:36px;margin-bottom:10px;color:var(--correct);text-shadow:0 0 20px var(--correct)">Good
+          enough!</h2>
+        <p style="color:rgba(255,255,255,.8);margin-bottom:25px">You popped
+          <span id="bg-result-score"></span> balloons.</p>
+        <button id="balloon-next-btn" class="submit-btn">Get My Present
+          🎁</button>
+      </div>
+    </div>
+
+    <!-- Finale -->
+    <div id="finale">
+      <div id="finale-text">
+        <h1>YOU SURVIVED!<br>HAPPY BIRTHDAY! 🎉</h1>
+        <p>You truly know your stuff. Now go celebrate!</p>
+        <button id="open-present-btn" class="opt-btn"
+          style="margin-top:20px;font-size:20px;background:var(--accent1);border:none;">Open
+          Present 🎁</button>
+      </div>
+
+      <div id="present-phase"
+        style="display:none;flex-direction:column;align-items:center;gap:4px;">
+
+        <!-- Countdown -->
+        <div id="countdown-wrap">
+          <span id="countdown-num">10</span>
+          <span id="countdown-label">sec to open this layer!</span>
+        </div>
+        <!-- Heat meter -->
+        <div id="heat-bar-wrap"><div id="heat-bar"></div></div>
+        <div id="heat-label">🧊 Ice cold...</div>
+
+        <!-- 3D Gift Box Scene -->
+        <div class="gift-scene" id="gift-scene">
+          <div class="bow" id="bow">🎀</div>
+          <div class="gift-lid" id="gift-lid">
+            <div class="lid-face lid-top"></div>
+            <div class="lid-face lid-front"></div>
+            <div class="lid-face lid-left"></div>
+            <div class="lid-face lid-right"></div>
+            <div class="lid-face lid-back"></div>
+          </div>
+          <div class="gift-box" id="gift-box">
+            <div class="gift-face gift-front"></div>
+            <div class="gift-face gift-back"></div>
+            <div class="gift-face gift-left"></div>
+            <div class="gift-face gift-right"></div>
+            <div class="gift-face gift-bottom"></div>
+          </div>
+        </div>
+
+        <h2 id="box-counter">Click to unwrap — 20 layers!</h2>
+
+        <!-- Final Reveal -->
+        <div id="final-reveal">
+          <div class="reveal-msg">i am the present 😂</div>
+          <div class="reveal-sub">hahahah — you fell for it!!</div>
+          <div style="font-size:50px;margin:8px 0;">🎉🎊🥳</div>
+          <div id="letter-wrap">
+            <div id="letter-text"></div>
+            <div id="letter-sig">— youssef sanafawy 🎁</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+/* ==========================================================
+   BIRTHDAY SURPRISE — Single-file Interactive Experience
+   ========================================================== */
+
+// ===== AUDIO HELPERS =====
+// All sounds come from the local /audio folder — drop your MP3s there!
+let duckTimeout = null;
+let bgFading = false;
+
+function playSound(id, duckBg = true){
+  try{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.currentTime = 0;
+    el.volume = 1.0; // Max volume for SFX
+    el.play().catch(()=>{});
+
+    if (duckBg && !bgFading) {
+      const bg = document.getElementById('bg-audio');
+      if (bg && !bg.paused) {
+        bg.volume = 0.05; // Duck background volume
+        clearTimeout(duckTimeout);
+        duckTimeout = setTimeout(() => {
+          if (!bgFading) bg.volume = 0.35; // Restore after SFX finishes
+        }, 4000);
+      }
+    }
+  }catch(e){}
+}
+const SFX = { buzz: 'sfx-buzz', pop: 'sfx-pop' };
+
+// ===== CANVAS PARTICLE SYSTEM =====
+const canvas=document.getElementById('bg-canvas');
+const ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=innerWidth;H=canvas.height=innerHeight}
+resize();
+window.addEventListener('resize',resize);
+
+// Particle types
+const COLORS=['#ff4081','#7c4dff','#00e5ff','#ffd700','#00e676','#ff6b35','#e040fb','#ffab40'];
+
+class Particle{
+  constructor(opts={}){
+    this.reset(opts);
+  }
+  reset(opts={}){
+    this.x=opts.x??Math.random()*W;
+    this.y=opts.y??(H+20+Math.random()*100);
+    this.type=opts.type??['balloon','orb','confetti'][Math.floor(Math.random()*3)];
+    this.size=opts.size??(this.type==='balloon'?Math.random()*18+12:this.type==='orb'?Math.random()*6+3:Math.random()*6+3);
+    this.depth=opts.depth??(Math.random()*0.7+0.3);
+    this.speedY=opts.speedY??(-(Math.random()*1.5+0.5)*this.depth);
+    this.speedX=opts.speedX??((Math.random()-0.5)*0.5);
+    this.color=opts.color??COLORS[Math.floor(Math.random()*COLORS.length)];
+    this.rotation=Math.random()*360;
+    this.rotSpeed=(Math.random()-0.5)*4;
+    this.opacity=opts.opacity??(this.depth*0.8+0.2);
+    this.alive=true;
+    this.exploding=false;
+    this.explodeTimer=0;
+    // Confetti burst specific
+    this.gravity=opts.gravity??0;
+    this.life=opts.life??Infinity;
+    this.age=0;
+  }
+  update(){
+    if(!this.alive)return;
+    if(this.exploding){
+      this.explodeTimer++;
+      this.size+=2;
+      this.opacity-=0.08;
+      if(this.opacity<=0)this.alive=false;
+      return;
+    }
+    this.age++;
+    if(this.age>this.life){this.alive=false;return}
+    this.x+=this.speedX;
+    this.y+=this.speedY;
+    this.speedY+=this.gravity;
+    this.rotation+=this.rotSpeed;
+    // Recycle if off-screen (only for ambient particles)
+    if(this.life===Infinity&&(this.y<-50||this.x<-50||this.x>W+50)){
+      this.reset();
+    }
+  }
+  draw(c){
+    if(!this.alive||this.opacity<=0)return;
+    c.save();
+    c.globalAlpha=Math.max(0,this.opacity);
+    c.translate(this.x,this.y);
+    c.rotate(this.rotation*Math.PI/180);
+    if(this.exploding){
+      // Explosion ring
+      c.beginPath();
+      c.arc(0,0,this.size,0,Math.PI*2);
+      c.strokeStyle=this.color;
+      c.lineWidth=3;
+      c.stroke();
+      c.restore();
+      return;
+    }
+    if(this.type==='balloon'){
+      c.beginPath();
+      c.ellipse(0,0,this.size*0.7,this.size,0,0,Math.PI*2);
+      c.fillStyle=this.color;
+      c.fill();
+      // Balloon string
+      c.beginPath();
+      c.moveTo(0,this.size);
+      c.quadraticCurveTo(3,this.size+10,-2,this.size+20);
+      c.strokeStyle='rgba(255,255,255,0.3)';
+      c.lineWidth=1;
+      c.stroke();
+      // Shine
+      c.beginPath();
+      c.ellipse(-this.size*0.2,-this.size*0.3,this.size*0.15,this.size*0.25,-.5,0,Math.PI*2);
+      c.fillStyle='rgba(255,255,255,0.3)';
+      c.fill();
+    }else if(this.type==='orb'){
+      const g=c.createRadialGradient(0,0,0,0,0,this.size);
+      g.addColorStop(0,this.color);
+      g.addColorStop(1,'transparent');
+      c.beginPath();
+      c.arc(0,0,this.size,0,Math.PI*2);
+      c.fillStyle=g;
+      c.fill();
+    }else{
+      // Confetti rectangle
+      c.fillStyle=this.color;
+      c.fillRect(-this.size/2,-this.size/4,this.size,this.size/2);
+    }
+    c.restore();
+  }
+}
+
+// Particle pool
+let particles=[];
+const MAX_AMBIENT=150;
+let finaleMode=false;
+
+function initAmbientParticles(){
+  particles=[];
+  for(let i=0;i<MAX_AMBIENT;i++){
+    particles.push(new Particle({y:Math.random()*H}));
+  }
+}
+
+// Confetti burst from a point
+function burstConfetti(x,y,count=40){
+  for(let i=0;i<count;i++){
+    const angle=Math.random()*Math.PI*2;
+    const speed=Math.random()*8+3;
+    particles.push(new Particle({
+      x,y,type:'confetti',
+      speedX:Math.cos(angle)*speed,
+      speedY:Math.sin(angle)*speed-3,
+      gravity:0.15,
+      life:80+Math.random()*40,
+      size:Math.random()*8+3,
+      depth:1,opacity:1
+    }));
+  }
+}
+
+// Explode balloons
+function explodeBalloons(count=7){
+  let popped=0;
+  for(let i=particles.length-1;i>=0&&popped<count;i--){
+    if(particles[i].type==='balloon'&&!particles[i].exploding&&particles[i].alive){
+      particles[i].exploding=true;
+      popped++;
+    }
+  }
+}
+
+// Finale infinite confetti
+function startFinaleConfetti(){
+  finaleMode=true;
+}
+
+// Animation loop
+let animRunning=false;
+function startCanvasLoop(){
+  if(animRunning)return;
+  animRunning=true;
+  initAmbientParticles();
+  (function loop(){
+    ctx.clearRect(0,0,W,H);
+    // Draw gradient bg
+    const bg=ctx.createLinearGradient(0,0,W,H);
+    bg.addColorStop(0,'#0f0c29');
+    bg.addColorStop(0.5,'#302b63');
+    bg.addColorStop(1,'#24243e');
+    ctx.fillStyle=bg;
+    ctx.fillRect(0,0,W,H);
+
+    // Ambient replenish
+    const ambientCount=particles.filter(p=>p.life===Infinity&&p.alive).length;
+    if(ambientCount<MAX_AMBIENT&&!finaleMode){
+      particles.push(new Particle());
+    }
+    // Finale confetti
+    if(finaleMode&&Math.random()<0.5){
+      particles.push(new Particle({
+        x:Math.random()*W,y:-10,type:'confetti',
+        speedX:(Math.random()-0.5)*3,speedY:Math.random()*3+1,
+        gravity:0.05,life:200,size:Math.random()*8+3,depth:1,opacity:1
+      }));
+    }
+    // Update & draw
+    particles=particles.filter(p=>p.alive);
+    particles.forEach(p=>{p.update();p.draw(ctx)});
+    requestAnimationFrame(loop);
+  })();
+}
+
+// ===== PHASE MANAGEMENT =====
+const bootScreen=document.getElementById('boot-screen');
+const cakePhase=document.getElementById('cake-phase');
+const quizPhase=document.getElementById('quiz-phase');
+const finaleDiv=document.getElementById('finale');
+
+// Phase 0: Boot Sequence
+function bootSequence(){
+  document.getElementById('boot-screen').style.display = 'flex';
+  const lines=document.querySelectorAll('#terminal .line');
+  let i=0;
+  function showLine(){
+    if(i>=lines.length){
+      // Transition after short pause
+      setTimeout(()=>{
+        bootScreen.classList.add('fade-out');
+        startCanvasLoop();
+        setTimeout(()=>{
+          bootScreen.style.display='none';
+          startCakePhase();
+        },800);
+      },400);
+      return;
+    }
+    const line=lines[i];
+    const fullText=line.dataset.text;
+    line.classList.add('visible');
+    // Typewriter
+    let ci=0;
+    line.innerHTML='';
+    const tw=setInterval(()=>{
+      line.innerHTML=fullText.substring(0,ci+1)+'<span class="cursor-blink"></span>';
+      ci++;
+      if(ci>=fullText.length){
+        clearInterval(tw);
+        line.innerHTML=fullText;
+        i++;
+        setTimeout(showLine,200);
+      }
+    },30);
+  }
+  setTimeout(showLine,500);
+}
+
+document.getElementById('start-btn').addEventListener('click', () => {
+  document.getElementById('init-screen').style.display = 'none';
+  const bgAudio = document.getElementById('bg-audio');
+  bgAudio.loop = true;           // force loop via JS as extra safety
+  bgAudio.volume = 0.35;
+  // Fallback: restart manually if the 'ended' event fires (some browsers ignore the loop attr on certain formats)
+  bgAudio.addEventListener('ended', function restartBg() {
+    bgAudio.currentTime = 0;
+    bgAudio.play().catch(() => {});
+  });
+  bgAudio.play().catch(e => console.log('Background music failed (place audio/background.mp3 in the audio/ folder):', e));
+  bootSequence();
+});
+
+// Phase 1: Cake
+const NUM_CANDLES=5;
+let flamesLeft=NUM_CANDLES;
+let micStream = null;
+let audioCtx = null;
+
+function startCakePhase(){
+  cakePhase.classList.add('active');
+  
+  // Initialize Mic for blowing out candles
+  try {
+    navigator.mediaDevices.getUserMedia({audio:true}).then(stream => {
+      micStream = stream;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      
+      function checkAudio() {
+        if(flamesLeft <= 0) return;
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for(let i=0; i<dataArray.length; i++) sum += dataArray[i];
+        let avg = sum / dataArray.length;
+        
+        if(avg > 60) { // Mic volume threshold
+          const litFlames = document.querySelectorAll('.flame-wrap[data-lit="true"]');
+          if(litFlames.length > 0) litFlames[0].click(); // Simulate clicking a flame
+        }
+        if(flamesLeft > 0) requestAnimationFrame(checkAudio);
+      }
+      checkAudio();
+    }).catch(e => console.log("Mic access denied or error", e));
+  } catch(e) { console.log("Audio API not supported"); }
+
+  const candlesDiv=document.getElementById('candles');
+  candlesDiv.innerHTML='';
+  for(let i=0;i<NUM_CANDLES;i++){
+    const c=document.createElement('div');
+    c.className='candle';
+    c.innerHTML=`
+      <div class="flame-wrap" data-lit="true">
+        <div class="flame"></div>
+        <div class="flame-glow"></div>
+      </div>
+      <div class="candle-stick"></div>`;
+    c.querySelector('.flame-wrap').addEventListener('click',function(e){
+      e.stopPropagation();
+      if(this.dataset.lit==='true'){
+        this.dataset.lit='false';
+        this.classList.add('out');
+        flamesLeft--;
+        // Small burst
+        const r=this.getBoundingClientRect();
+        burstConfetti(r.left+r.width/2,r.top+r.height/2,15);
+        if(flamesLeft<=0){
+          setTimeout(()=>{
+            document.getElementById('cake').classList.add('exit');
+            setTimeout(()=>{
+              cakePhase.classList.remove('active');
+              startQuizPhase();
+            },800);
+          },500);
+        }
+      }
+    });
+    candlesDiv.appendChild(c);
+  }
+}
+
+// Phase 2: Quiz
+// type:'choices' = multiple-choice buttons (default if omitted)
+// type:'text'    = free-text input field
+const questions=[
+  {q:"What is my all-time favorite football team?",opts:["Argentina","Al Ahly","Barcelona","Egypt"],ans:"Barcelona"},
+  {q:"Which subject u asked me to send materials for in the very first days",opts:["Maths","Physics","Mechanics","Arabic"],ans:"Arabic"},
+  {q:"What's date of last talk?",opts:["27/04","26/04","25/04","24/04"],ans:"26/04"},
+  {q:"when i text u, constantly i named u with?",opts:["يبشمهندسه","يا بشمهندسه","يابش مهندسه"],ans:"يبشمهندسه"},
+  {q:"2nd Longest Discord Call hours ( As i know the first one hhh) ",opts:["10","9","8","7"],ans:"8"},
+  {q:"My First crush name was",opts:["mariam","nour","yasmeen","Eman"],ans:"nour"},
+  // ---- Text-input questions (no opts array needed) ----
+  {type:'text', q:"waht is my birthday date", ans:"23/5/2005", hint:"(no cheetttinnnggg)"},
+  {type:'text', q:"What is my favourite artist 🎵", ans:"BigSam", hint:"(think of Males)"},
+  {type:'text', q:"Finish this sentence: 'Mariam is acting as st..........'", ans:"strong independent woman", hint:"be honest hhhh"},
+];
+let qIndex=0;
+let throttled=false;
+
+function startQuizPhase(){
+  qIndex=0;
+  quizPhase.classList.add('active');
+  renderQuestion();
+}
+
+function renderQuestion(){
+  const q=questions[qIndex];
+  document.getElementById('q-counter').textContent=`Question ${qIndex+1} of ${questions.length}`;
+  document.getElementById('q-text').textContent=q.q;
+  document.getElementById('progress-fill').style.width=`${(qIndex/questions.length)*100}%`;
+  const opts=document.getElementById('options');
+  opts.innerHTML='';
+
+  if(q.type==='text'){
+    // --- FREE TEXT INPUT ---
+    const wrap=document.createElement('div');
+    wrap.className='text-answer-wrap';
+
+    const input=document.createElement('input');
+    input.type='text';
+    input.className='text-answer-input';
+    input.id='text-answer-input';
+    input.placeholder='Type your answer...';
+    input.autocomplete='off';
+    // Support Arabic RTL automatically
+    input.setAttribute('dir','auto');
+    wrap.appendChild(input);
+
+    if(q.hint){
+      const hint=document.createElement('div');
+      hint.className='hint-text';
+      hint.textContent=q.hint;
+      wrap.appendChild(hint);
+    }
+
+    const submitBtn=document.createElement('button');
+    submitBtn.className='submit-btn';
+    submitBtn.textContent='Submit ✓';
+    submitBtn.id='text-submit-btn';
+    wrap.appendChild(submitBtn);
+
+    // Submit on button click or Enter key
+    const doSubmit=()=>handleTextAnswer(input.value.trim(),input,submitBtn);
+    submitBtn.addEventListener('click',doSubmit);
+    input.addEventListener('keydown',e=>{ if(e.key==='Enter') doSubmit(); });
+
+    opts.appendChild(wrap);
+    setTimeout(()=>input.focus(),100);
+  } else {
+    // --- MULTIPLE CHOICE ---
+    q.opts.forEach(opt=>{
+      const btn=document.createElement('button');
+      btn.className='opt-btn';
+      btn.textContent=opt;
+      btn.id='opt-'+opt.replace(/\s+/g,'-').toLowerCase();
+      btn.addEventListener('click',()=>handleAnswer(opt,btn));
+      opts.appendChild(btn);
+    });
+  }
+}
+
+function handleAnswer(selected,btn){
+  if(throttled)return;
+  throttled=true;
+  setTimeout(()=>{throttled=false},350);
+
+  const q=questions[qIndex];
+  if(selected===q.ans){
+    // Correct
+    btn.classList.add('correct');
+    const r=btn.getBoundingClientRect();
+    burstConfetti(r.left+r.width/2,r.top+r.height/2,50);
+    document.getElementById('progress-fill').style.width=`${((qIndex+1)/questions.length)*100}%`;
+    setTimeout(()=>{
+      qIndex++;
+      if(qIndex>=questions.length){
+        // Done!
+        document.getElementById('quiz-modal').classList.add('exit');
+        setTimeout(()=>{
+          quizPhase.classList.remove('active');
+          startScratchPhase();
+        },800);
+      }else{
+        renderQuestion();
+      }
+    },700);
+  }else{
+    // Wrong
+    btn.classList.add('wrong');
+    const modal=document.getElementById('quiz-modal');
+    modal.classList.remove('shake');
+    void modal.offsetWidth;// reflow
+    modal.classList.add('shake');
+    playSound(SFX.buzz);
+    playSound(SFX.pop);
+    explodeBalloons(7);
+    setTimeout(()=>btn.classList.remove('wrong'),500);
+  }
+}
+
+// Handler for free-text input questions
+function handleTextAnswer(value, inputEl, submitBtn) {
+  if(throttled) return;
+  if(!value) return; // don't allow empty submit
+  throttled = true;
+  setTimeout(() => { throttled = false; }, 400);
+
+  const q = questions[qIndex];
+
+  // If ans is null, ANY non-empty answer is accepted (open-ended question)
+  const isCorrect = q.ans === null
+    ? true
+    : value.toLowerCase().trim() === q.ans.toLowerCase().trim();
+
+  if(isCorrect){
+    inputEl.classList.add('correct-input');
+    inputEl.disabled = true;
+    submitBtn.disabled = true;
+    submitBtn.textContent = '✓ Correct!';
+    submitBtn.style.background = 'linear-gradient(135deg,var(--correct),#00695c)';
+
+    const r = inputEl.getBoundingClientRect();
+    burstConfetti(r.left + r.width/2, r.top + r.height/2, 50);
+    document.getElementById('progress-fill').style.width = `${((qIndex+1)/questions.length)*100}%`;
+
+    setTimeout(() => {
+      qIndex++;
+      if(qIndex >= questions.length){
+        document.getElementById('quiz-modal').classList.add('exit');
+        setTimeout(() => {
+          quizPhase.classList.remove('active');
+          startScratchPhase();
+        }, 800);
+      } else {
+        renderQuestion();
+      }
+    }, 800);
+  } else {
+    // Wrong — shake input, shake modal, buzz
+    inputEl.classList.add('wrong-input');
+    const modal = document.getElementById('quiz-modal');
+    modal.classList.remove('shake');
+    void modal.offsetWidth;
+    modal.classList.add('shake');
+    playSound(SFX.buzz);
+    explodeBalloons(5);
+    setTimeout(() => {
+      inputEl.classList.remove('wrong-input');
+      inputEl.value = '';
+      inputEl.focus();
+    }, 600);
+  }
+}
+
+// ===== PHASE 2.5: SCRATCH CARD =====
+const scratchPhase = document.getElementById('scratch-phase');
+const scratchCanvas = document.getElementById('scratch-canvas');
+const scratchCtx = scratchCanvas.getContext('2d', { willReadFrequently: true });
+const scratchNextBtn = document.getElementById('scratch-next-btn');
+let isDrawing = false;
+let scratchCleared = false;
+
+function startScratchPhase() {
+  scratchPhase.classList.add('active');
+  // Fill with silver
+  scratchCtx.fillStyle = '#a0a0a0';
+  scratchCtx.fillRect(0, 0, scratchCanvas.width, scratchCanvas.height);
+  // Add some texture/text
+  scratchCtx.font = '24px sans-serif';
+  scratchCtx.fillStyle = '#606060';
+  scratchCtx.textAlign = 'center';
+  scratchCtx.fillText('SCRATCH ME', scratchCanvas.width/2, scratchCanvas.height/2 + 8);
+  
+  scratchCtx.globalCompositeOperation = 'destination-out';
+  scratchCtx.lineWidth = 40;
+  scratchCtx.lineCap = 'round';
+  scratchCtx.lineJoin = 'round';
+}
+
+function getScratchPos(e) {
+  const rect = scratchCanvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return {
+    x: (clientX - rect.left) * (scratchCanvas.width / rect.width),
+    y: (clientY - rect.top) * (scratchCanvas.height / rect.height)
+  };
+}
+
+function scratchMove(e) {
+  if (!isDrawing || scratchCleared) return;
+  e.preventDefault();
+  const pos = getScratchPos(e);
+  scratchCtx.lineTo(pos.x, pos.y);
+  scratchCtx.stroke();
+  
+  // Check completion roughly every few moves
+  if (Math.random() < 0.1) checkScratchCompletion();
+}
+
+scratchCanvas.addEventListener('mousedown', (e) => {
+  isDrawing = true;
+  const pos = getScratchPos(e);
+  scratchCtx.beginPath();
+  scratchCtx.moveTo(pos.x, pos.y);
+});
+scratchCanvas.addEventListener('mousemove', scratchMove);
+window.addEventListener('mouseup', () => { isDrawing = false; });
+
+scratchCanvas.addEventListener('touchstart', (e) => {
+  isDrawing = true;
+  const pos = getScratchPos(e);
+  scratchCtx.beginPath();
+  scratchCtx.moveTo(pos.x, pos.y);
+}, {passive: false});
+scratchCanvas.addEventListener('touchmove', scratchMove, {passive: false});
+window.addEventListener('touchend', () => { isDrawing = false; });
+
+function checkScratchCompletion() {
+  const pixels = scratchCtx.getImageData(0, 0, scratchCanvas.width, scratchCanvas.height).data;
+  let transparentCount = 0;
+  for (let i = 3; i < pixels.length; i += 4) {
+    if (pixels[i] < 128) transparentCount++;
+  }
+  const pct = transparentCount / (pixels.length / 4);
+  if (pct > 0.5) {
+    scratchCleared = true;
+    scratchCanvas.style.opacity = '0';
+    setTimeout(() => { scratchCanvas.style.display = 'none'; }, 500);
+    scratchNextBtn.classList.add('show');
+    burstConfetti(W/2, H/2, 80);
+    playSound(SFX.pop);
+  }
+}
+
+scratchNextBtn.addEventListener('click', () => {
+  scratchPhase.classList.remove('active');
+  startBalloonPhase();
+});
+
+// ===== PHASE 2.75: BALLOON GAME =====
+const balloonPhase = document.getElementById('balloon-game-phase');
+const bgTimerVal = document.getElementById('bg-timer-val');
+const bgScoreVal = document.getElementById('bg-score-val');
+const bgResult = document.getElementById('balloon-game-result');
+const balloonHud = document.getElementById('balloon-hud');
+let bgScore = 0;
+let bgTime = 10;
+let balloonGameActive = false;
+let bgInterval;
+
+function startBalloonPhase() {
+  balloonPhase.classList.add('active');
+  balloonGameActive = true;
+  bgScore = 0;
+  bgTime = 10;
+  bgScoreVal.textContent = '0';
+  bgTimerVal.textContent = '10';
+  
+  // Rapid balloon spawn
+  bgInterval = setInterval(() => {
+    if(!balloonGameActive) return;
+    particles.push(new Particle({
+      type: 'balloon',
+      speedY: -(Math.random() * 3 + 3),
+      size: Math.random() * 25 + 20, // bigger target
+      life: Infinity
+    }));
+  }, 100);
+  
+  // Game timer
+  const timer = setInterval(() => {
+    bgTime--;
+    bgTimerVal.textContent = bgTime;
+    if (bgTime <= 0) {
+      clearInterval(timer);
+      clearInterval(bgInterval);
+      endBalloonPhase();
+    }
+  }, 1000);
+}
+
+// Intercept canvas clicks for balloon game
+canvas.addEventListener('click', (e) => {
+  if (!balloonGameActive) return;
+  const rect = canvas.getBoundingClientRect();
+  const clickX = e.clientX - rect.left;
+  const clickY = e.clientY - rect.top;
+  
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    if (p.type === 'balloon' && p.alive && !p.exploding) {
+      const dist = Math.hypot(p.x - clickX, p.y - clickY);
+      if (dist < p.size * 1.5) {
+        p.exploding = true;
+        bgScore++;
+        bgScoreVal.textContent = bgScore;
+        playSound(SFX.pop);
+        burstConfetti(p.x, p.y, 10);
+        break; // Only pop one per click
+      }
+    }
+  }
+});
+
+function endBalloonPhase() {
+  balloonGameActive = false;
+  balloonHud.style.opacity = '0';
+  bgResult.style.display = 'flex';
+  document.getElementById('bg-result-score').textContent = bgScore;
+  
+  const title = document.getElementById('bg-result-title');
+  if (bgScore >= 20) {
+    title.textContent = 'Flawless Victory! 🏆';
+    burstConfetti(W/2, H/2, 100);
+  } else {
+    title.textContent = 'Good enough! 😅';
+  }
+}
+
+document.getElementById('balloon-next-btn').addEventListener('click', () => {
+  balloonPhase.classList.remove('active');
+  showFinale();
+});
+
+// Finale
+function showFinale(){
+  finaleDiv.classList.add('active');
+  startFinaleConfetti();
+
+}
+
+// ===== CUSTOM CURSOR TRAIL =====
+document.addEventListener('mousemove', (e) => {
+  if(Math.random() > 0.4) return; // Throttle to prevent too many particles
+  const dot = document.createElement('div');
+  dot.className = 'cursor-trail';
+  dot.style.left = (e.clientX - 4) + 'px';
+  dot.style.top = (e.clientY - 4) + 'px';
+  dot.style.background = COLORS[Math.floor(Math.random()*COLORS.length)];
+  document.body.appendChild(dot);
+  setTimeout(() => dot.remove(), 500);
+});
+
+// ===== KONAMI CODE (EASTER EGG) =====
+const konami = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+let konamiIdx = 0;
+document.addEventListener('keydown', (e) => {
+  if(e.key === konami[konamiIdx]) {
+    konamiIdx++;
+    if(konamiIdx === konami.length) {
+      burstConfetti(W/2, H/2, 200); // Massive confetti burst
+      playSound(SFX.pop);
+      konamiIdx = 0;
+    }
+  } else {
+    konamiIdx = 0;
+  }
+});
+
+// ===== PRESENT BOX LOGIC (3D Gift Scene — Full Edition) =====
+let boxesLeft = 20;
+let lidOpened = false;
+let countdownInterval = null;
+let countdownSec = 10;
+
+const BOX_THEMES = [
+  ['#ff4081','#c2185b'],['#7c4dff','#4527a0'],['#00e5ff','#006064'],
+  ['#ffd700','#ff8f00'],['#00e676','#00695c'],['#ff6b35','#bf360c'],
+  ['#e040fb','#6a1b9a'],['#ff4081','#880e4f'],['#40c4ff','#0277bd'],
+  ['#69f0ae','#2e7d32'],['#ffab40','#e65100'],['#ea80fc','#4a148c'],
+  ['#ff6d00','#bf360c'],['#b2ff59','#33691e'],['#84ffff','#006064'],
+  ['#ff9100','#e65100'],['#ccff90','#1b5e20'],['#ff80ab','#880e4f'],
+  ['#82b1ff','#1a237e'],['#00e5ff','#7c4dff']
+];
+
+const HEAT_MSGS = [
+  '🧊 Ice cold...','🧊 Still freezing...','🌬️ A little chilly...',
+  '🌬️ Getting warmer...','☀️ Mild...','☀️ Warming up!',
+  '🔆 Noticeably warm!','🔆 Warm!','🌶️ Getting hot...',
+  '🌶️ Hot!','🔥 Very hot!!','🔥 BURNING!!!',
+  '🔥🔥 ON FIRE!!!','🔥🔥 SCORCHING!!!','🔥🔥🔥 YOU ARE THE SUN!!!',
+  '🔥🔥🔥 SUPERNOVA!!!','🌋 LAVA MODE!!!','💥 NUCLEAR!!!',
+  '🚀 BEYOND LIMITS!!!','✨ THE TRUTH AWAITS...'
+];
+
+const LETTER = `Dear Mariam,
+
+Yes. I am the present.
+After 20 boxes, this is what you get:
+
+A sincere, wholehearted HAPPY BIRTHDAY.
+
+You deserve every balloon, every confetti
+rain, every ridiculous quiz question,
+and every single box you just clicked.
+
+Thank you for being you.
+Now go eat some real cake. hhhhhhhhhh 🎂
+
+see you next terrible gift-wrapping,`;
+
+// --- Screen shake ---
+function shakeScreen() {
+  document.body.classList.remove('screen-shake');
+  void document.body.offsetWidth; // force reflow
+  document.body.classList.add('screen-shake');
+  setTimeout(() => document.body.classList.remove('screen-shake'), 420);
+}
+
+// --- Heat meter ---
+function updateHeatMeter(layerNum) {
+  const pct = (layerNum / 20) * 100;
+  const bar = document.getElementById('heat-bar');
+  const lbl = document.getElementById('heat-label');
+  bar.style.width = pct + '%';
+  const r = Math.round(Math.min(255, (pct / 50) * 255));
+  const g = Math.round(Math.max(0, 255 - Math.max(0, pct - 50) / 50 * 255));
+  bar.style.background = `linear-gradient(90deg,#00e676,rgb(${r},${g},0))`;
+  lbl.textContent = HEAT_MSGS[Math.min(layerNum, HEAT_MSGS.length - 1)];
+}
+
+// --- Countdown timer per layer ---
+function startLayerCountdown() {
+  clearInterval(countdownInterval);
+  countdownSec = 10;
+  const numEl = document.getElementById('countdown-num');
+  const wrap  = document.getElementById('countdown-wrap');
+  numEl.textContent = countdownSec;
+  wrap.classList.remove('danger');
+
+  countdownInterval = setInterval(() => {
+    countdownSec--;
+    numEl.textContent = countdownSec;
+    if (countdownSec <= 3) wrap.classList.add('danger');
+    if (countdownSec <= 0) {
+      clearInterval(countdownInterval);
+      // Time ran out — shake and buzz, restart countdown for same layer
+      shakeScreen();
+      playSound(SFX.buzz);
+      startLayerCountdown();
+    }
+  }, 1000);
+}
+
+// --- Music fade swap ---
+function fadeSwapMusic() {
+  bgFading = true; // prevent ducking logic from restoring volume
+  const bg = document.getElementById('bg-audio');
+  const fanfare = document.getElementById('sfx-fanfare');
+  let vol = parseFloat(bg.volume) || 0.35;
+  const fadeOut = setInterval(() => {
+    vol = Math.max(0, vol - 0.04);
+    try { bg.volume = vol; } catch(e) {}
+    if (vol <= 0) { clearInterval(fadeOut); bg.pause(); }
+  }, 80);
+  if (fanfare) {
+    fanfare.volume = 0.7;
+    fanfare.play().catch(() => {});
+  }
+}
+
+// --- Typewriter ---
+function typewriterLetter(text, el, speed) {
+  let i = 0;
+  el.textContent = '';
+  const tw = setInterval(() => {
+    el.textContent += text[i];
+    i++;
+    if (i >= text.length) clearInterval(tw);
+  }, speed || 22);
+}
+
+// --- Open Present button ---
+document.getElementById('open-present-btn').addEventListener('click', () => {
+  document.getElementById('finale-text').style.display = 'none';
+  document.getElementById('present-phase').style.display = 'flex';
+  updateHeatMeter(0);
+  startLayerCountdown();
+});
+
+// --- Gift scene click ---
+document.getElementById('gift-scene').addEventListener('click', function() {
+  if (boxesLeft <= 0) return;
+
+  // First click: fly the lid off, hide bow
+  if (!lidOpened) {
+    lidOpened = true;
+    document.getElementById('gift-lid').classList.add('open');
+    document.getElementById('bow').classList.add('hidden');
+  }
+
+  boxesLeft--;
+  const layerNum = 20 - boxesLeft;
+
+  shakeScreen();
+  playSound(SFX.pop);
+  burstConfetti(W / 2, H / 2, 35);
+  updateHeatMeter(layerNum);
+
+  const counter = document.getElementById('box-counter');
+  const giftBox = document.getElementById('gift-box');
+  const giftLid = document.getElementById('gift-lid');
+
+  if (boxesLeft > 0) {
+    startLayerCountdown();
+
+    const [c1, c2] = BOX_THEMES[(layerNum - 1) % BOX_THEMES.length];
+    giftBox.querySelector('.gift-front').style.background = `linear-gradient(135deg,${c1},${c2})`;
+    giftBox.querySelector('.gift-back').style.background  = c2;
+    giftBox.querySelector('.gift-left').style.background  = `linear-gradient(135deg,${c2},${c2})`;
+    giftBox.querySelector('.gift-right').style.background = `linear-gradient(135deg,${c1},${c2})`;
+    giftBox.querySelector('.gift-bottom').style.background = c2;
+    giftLid.querySelector('.lid-top').style.background   = `linear-gradient(135deg,${c1}cc,${c1})`;
+    giftLid.querySelector('.lid-front').style.background = `linear-gradient(to bottom,${c1}cc,${c1})`;
+    giftLid.querySelector('.lid-left').style.background  = `linear-gradient(to bottom,${c2}cc,${c2})`;
+    giftLid.querySelector('.lid-right').style.background = `linear-gradient(to bottom,${c1}aa,${c1})`;
+
+    // Wobble physics
+    giftBox.style.transform = 'rotateX(20deg) rotateY(-25deg) rotateZ(-7deg) scale(0.9)';
+    setTimeout(() => {
+      giftBox.style.transform = 'rotateX(20deg) rotateY(-25deg) rotateZ(5deg) scale(1.06)';
+      setTimeout(() => { giftBox.style.transform = 'rotateX(20deg) rotateY(-25deg) scale(1)'; }, 150);
+    }, 120);
+
+    const scale = 0.44 + (boxesLeft / 20) * 0.56;
+    document.getElementById('gift-scene').style.transform = `scale(${scale})`;
+    counter.textContent = `Layer ${layerNum} of 20 — ${boxesLeft} more to go!`;
+
+  } else {
+    // ===== FINAL REVEAL =====
+    clearInterval(countdownInterval);
+    document.getElementById('countdown-wrap').style.display = 'none';
+    document.getElementById('heat-bar-wrap').style.display  = 'none';
+    document.getElementById('heat-label').style.display     = 'none';
+    document.getElementById('gift-scene').style.display     = 'none';
+    counter.style.display = 'none';
+
+    const reveal = document.getElementById('final-reveal');
+    reveal.style.display = 'flex';
+
+    fadeSwapMusic();
+    burstConfetti(W / 2, H / 2, 300);
+    startFinaleConfetti();
+
+    setTimeout(() => {
+      typewriterLetter(LETTER, document.getElementById('letter-text'), 20);
+    }, 800);
+  }
+});
+
+</script>
+  </body>
+</html>
